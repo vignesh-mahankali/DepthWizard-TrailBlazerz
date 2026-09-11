@@ -4,6 +4,7 @@ import base64
 import json
 import numpy as np
 import cv2
+import uvicorn
 from PIL import Image
 from io import BytesIO
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query
