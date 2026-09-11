@@ -1,7 +1,7 @@
 venv/
 __pycache__/
 *.pyc
-Depth-Anything-V2/
+Depth-Anything-V2/checkpoints/
 *.obj
 *.ply
 *.glb
