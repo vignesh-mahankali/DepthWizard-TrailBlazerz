@@ -52,7 +52,28 @@ class DepthEngine:
             checkpoint_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'checkpoints', f'depth_anything_v2_{self.encoder}.pth')
             
         if not os.path.exists(checkpoint_path):
-            print(f"Checkpoint not found at {checkpoint_path}")
+            print(f"Checkpoint not found at {checkpoint_path}, attempting download...")
+            try:
+                import requests
+                os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+                url_map = {
+                    'vits': 'https://huggingface.co/depth-anything/Depth-Anything-V2-Small/resolve/main/depth_anything_v2_vits.pth',
+                    'vitb': 'https://huggingface.co/depth-anything/Depth-Anything-V2-Base/resolve/main/depth_anything_v2_vitb.pth',
+                    'vitl': 'https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth',
+                }
+                url = url_map.get(self.encoder)
+                if url:
+                    r = requests.get(url, stream=True, timeout=120)
+                    r.raise_for_status()
+                    with open(checkpoint_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    print(f"Downloaded checkpoint to {checkpoint_path}")
+            except Exception as e:
+                print(f"Checkpoint download failed: {e}")
+
+        if not os.path.exists(checkpoint_path):
+            print(f"Checkpoint still not found at {checkpoint_path}")
             return
         
         model_configs = {
@@ -592,7 +613,7 @@ class DisasterChangeDetector:
                 "area_gain_m2": area_gain_m2,
                 "volume_loss_m3": volume_loss_m3,
                 "volume_gain_m3": volume_gain_m3,
-                "net_volume_change_m3": net_volume_change_m3,
+                "net_volume_change_m3": net_volume_m3,
                 "max_elevation_loss_m": max_elevation_loss_m,
                 "max_elevation_gain_m": max_elevation_gain_m,
                 "mean_elevation_shift_m": mean_diff_m,
@@ -718,3 +739,5 @@ class MeshBuilder:
                     lines.append(f"f {p3}/{p3} {p2}/{p2} {p4}/{p4}")
                     
         return "\n".join(lines)
+
+
