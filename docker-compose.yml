@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  depthwizard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: depthwizard-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DEVICE=cpu
+      - MODEL_ENCODER=vits
+    volumes:
+      - ./exports:/app/exports
+      - ./dem_cache:/app/dem_cache
+      - ./Depth-Anything-V2/checkpoints:/app/Depth-Anything-V2/checkpoints
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

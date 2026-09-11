@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DepthWizard Enterprise | Single-View Height Estimation & 3D Earth Observation</title>
+    <!-- Modern Typography: Outfit & Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome 6 Pro-style icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for precision GIS telemetry -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Three.js Engine for 3D WebGL Flythrough -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="brand">
+                <div class="brand-icon-box">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    <span class="pulse-ring"></span>
+                </div>
+                <div class="brand-meta">
+                    <div class="brand-title-row">
+                        <h1 class="brand-title">DepthWizard</h1>
+                        <span class="badge-pro">ENTERPRISE GIS</span>
+                        <span class="badge-version">v2.2</span>
+                    </div>
+                    <p class="brand-subtitle">ISRO Optical Monocular Height Estimation & 3D Digital Surface Platform</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Central Workflow Mode Navigator -->
+        <nav class="mode-navigator">
+            <button class="nav-tab active" data-tab="single" id="tab-btn-single">
+                <i class="fa-solid fa-layer-group"></i>
+                <span>Single Scene DSM</span>
+            </button>
+            <button class="nav-tab" data-tab="disaster" id="tab-btn-disaster">
+                <i class="fa-solid fa-burst"></i>
+                <span>Disaster Analysis</span>
+            </button>
+            <button class="nav-tab" data-tab="catalog" id="tab-btn-catalog">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <span>Scene Catalog</span>
+            </button>
+            <button class="nav-tab" data-tab="validation" id="tab-btn-validation">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>DSM Accuracy</span>
+            </button>
+        </nav>
+
+        <!-- Header Right Utilities & Status -->
+        <div class="header-right">
+            <div class="telemetry-status-badge" id="backend-status-badge" title="Inference Engine Health">
+                <span class="indicator-dot online"></span>
+                <span class="status-label">Depth-Anything-V2</span>
+                <span class="status-device" id="status-device-text">CPU</span>
+            </div>
+
+            <button class="btn-icon-secondary" id="btn-capture-viewport" title="Capture 3D Viewport Snapshot (PNG)">
+                <i class="fa-solid fa-camera"></i>
+                <span>Capture</span>
+            </button>
+
+            <button class="btn-host-action" id="btn-open-hosting-modal" title="Deployment & Hosting Suite">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Deploy / Host</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Studio -->
+    <main class="studio-workspace">
+
+        <!-- Left Command Sidebar -->
+        <aside class="command-sidebar">
+            
+            <!-- Tab 1: Single Image DSM Workflow -->
+            <div class="sidebar-pane active" id="pane-single">
+                <div class="pane-section-header">
+                    <div class="section-title"><i class="fa-solid fa-sliders"></i> Optical Scene & Scale Anchors</div>
+                    <span class="section-hint">Monocular 3D Reconstruction</span>
+                </div>
+
+                <!-- Scene Preset Quick Select -->
+                <div class="control-group">
+                    <label class="control-label">Pre-Calibrated ISRO Scenes</label>
+                    <div class="preset-cards-row">
+                        <button class="preset-chip active" data-preset="wayanad_pre_disaster.jpg">
+                            <i class="fa-solid fa-mountain"></i>
+                            <div class="chip-text">
+                                <span class="chip-title">Wayanad Scarp</span>
+                                <span class="chip-sub">Hilly Mountain (530-1745m)</span>
+                            </div>
+                        </button>
+                        <button class="preset-chip" data-preset="urban_kolkata.jpg">
+                            <i class="fa-solid fa-city"></i>
+                            <div class="chip-text">
+                                <span class="chip-title">Kolkata Basin</span>
+                                <span class="chip-sub">Urban Delta (0-21m)</span>
+                            </div>
+                        </button>
+                        <button class="preset-chip" data-preset="wayanad_post_disaster.jpg">
+                            <i class="fa-solid fa-land-mine-on"></i>
+                            <div class="chip-text">
+                                <span class="chip-title">Landslide Zone</span>
+                                <span class="chip-sub">Ruptured Hillslope</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Optical Image Upload -->
+                <div class="control-group">
+                    <div class="label-split">
+                        <label class="control-label">Upload Custom Optical Image</label>
+                        <span class="badge-format">GeoTIFF / PNG / JPG</span>
+                    </div>
+                    <div class="pro-dropzone" id="dropzone-single">
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon-circle"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                            <div class="dropzone-text">
+                                <strong id="file-single-label">Drop satellite scene or click to browse</strong>
+                                <span>Supports high-resolution single-view optical imagery</span>
+                            </div>
+                        </div>
+                        <input type="file" id="input-single-file" accept=".jpg,.jpeg,.png,.tif,.tiff" hidden>
+                    </div>
+                </div>
+
+                <!-- Georeferencing & Calibration Parameters -->
+                <div class="calibration-card">
+                    <div class="calibration-header">
+                        <div class="toggle-title">
+                            <i class="fa-solid fa-satellite"></i>
+                            <span>Metric Scale Calibration</span>
+                        </div>
+                        <label class="switch-toggle">
+                            <input type="checkbox" id="check-georef" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <p class="card-caption">
+                        Anchors scale-agnostic depth into absolute metric height (Z in meters) via SRTM 30m / Copernicus DEM regression.
+                    </p>
+
+                    <div class="calibration-inputs-grid">
+                        <div class="param-input-col">
+                            <label class="mini-label">Base Elevation (Z₀)</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="input-base-elev" value="530" class="num-field">
+                                <span class="unit-tag">m</span>
+                            </div>
+                        </div>
+                        <div class="param-input-col">
+                            <label class="mini-label">Relief Range (ΔZ)</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="input-relief-range" value="1215" class="num-field">
+                                <span class="unit-tag">m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Primary Execution Button -->
+                <button class="btn-execute-primary" id="btn-process-single">
+                    <i class="fa-solid fa-cube"></i>
+                    <span>Generate DSM & 3D Terrain</span>
+                </button>
+            </div>
+
+            <!-- Tab 2: Disaster Damage Assessment Workflow -->
+            <div class="sidebar-pane" id="pane-disaster">
+                <div class="pane-section-header">
+                    <div class="section-title"><i class="fa-solid fa-burst"></i> Disaster Change Detection</div>
+                    <span class="section-hint">Volumetric & Scar Assessment</span>
+                </div>
+                <p class="pane-description">
+                    Performs bi-temporal elevation difference analysis (ΔZ = DSM_post - DSM_pre) to quantify landslide scars, earth displacement volume, and structural collapses.
+                </p>
+
+                <!-- Bi-temporal Upload Dropzones -->
+                <div class="bitemporal-pair-grid">
+                    <div class="temporal-upload-box">
+                        <span class="temporal-badge pre">PRE-DISASTER</span>
+                        <div class="pro-dropzone mini" id="dropzone-pre">
+                            <i class="fa-solid fa-image"></i>
+                            <span id="file-pre-label">Select Pre Image</span>
+                            <input type="file" id="input-pre-file" accept=".jpg,.jpeg,.png,.tif,.tiff" hidden>
+                        </div>
+                    </div>
+                    <div class="temporal-upload-box">
+                        <span class="temporal-badge post">POST-DISASTER</span>
+                        <div class="pro-dropzone mini" id="dropzone-post">
+                            <i class="fa-solid fa-image"></i>
+                            <span id="file-post-label">Select Post Image</span>
+                            <input type="file" id="input-post-file" accept=".jpg,.jpeg,.png,.tif,.tiff" hidden>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-disaster-select">
+                    <label class="control-label">Or Run Built-in Benchmark Pair</label>
+                    <select id="select-disaster-pair" class="pro-select">
+                        <option value="wayanad">Wayanad Landslide Disaster Sector (2024 Scarp)</option>
+                    </select>
+                </div>
+
+                <button class="btn-execute-hazard" id="btn-process-disaster">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Compute Elevation Shift (ΔZ)</span>
+                </button>
+
+                <!-- Dynamic Disaster Impact Card -->
+                <div class="disaster-impact-card" id="disaster-metrics-card">
+                    <div class="impact-card-title"><i class="fa-solid fa-chart-column"></i> Damage Assessment Metrics</div>
+                    <div class="impact-metrics-grid">
+                        <div class="impact-item">
+                            <span class="impact-lbl">Total Affected Area</span>
+                            <span class="impact-val" id="val-disaster-area">23.04 ha</span>
+                        </div>
+                        <div class="impact-item">
+                            <span class="impact-lbl">Displaced Volume</span>
+                            <span class="impact-val hazard-text" id="val-disaster-vol">2,750,612 m³</span>
+                        </div>
+                        <div class="impact-item">
+                            <span class="impact-lbl">Max Elevation Loss</span>
+                            <span class="impact-val danger-text" id="val-disaster-max-loss">-54.5 m</span>
+                        </div>
+                        <div class="impact-item">
+                            <span class="impact-lbl">Net Volume Shift</span>
+                            <span class="impact-val" id="val-disaster-net-vol">-1,012,898 m³</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Satellite Scene Catalog Workflow -->
+            <div class="sidebar-pane" id="pane-catalog">
+                <div class="pane-section-header">
+                    <div class="section-title"><i class="fa-solid fa-satellite"></i> Satellite Scene Catalog</div>
+                    <span class="section-hint">ISRO / Sentinel Index</span>
+                </div>
+
+                <div class="catalog-search-bar">
+                    <div class="search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="search-query" placeholder="Search region (e.g. Wayanad, Kolkata)..." class="pro-search-input">
+                    </div>
+                    <button class="btn-search-exec" id="btn-search-satellite">Search</button>
+                </div>
+
+                <div class="catalog-results-scroll" id="search-results-container">
+                    <!-- Dynamic satellite scenes loaded here -->
+                </div>
+            </div>
+
+            <!-- Tab 4: Validation Workflow -->
+            <div class="sidebar-pane" id="pane-validation">
+                <div class="pane-section-header">
+                    <div class="section-title"><i class="fa-solid fa-check-double"></i> Ground Truth Benchmark</div>
+                    <span class="section-hint">LiDAR / SRTM Metric Assessment</span>
+                </div>
+                <p class="pane-description">
+                    Validates monocular generated DSM against high-precision reference elevation models (SRTM 30m / Copernicus DEM).
+                </p>
+
+                <div class="benchmark-stats-overview">
+                    <div class="stat-box">
+                        <span class="stat-box-lbl">RMSE</span>
+                        <strong class="stat-box-val" id="stat-rmse">236.04 m</strong>
+                        <span class="stat-box-unit">Root Mean Square</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-box-lbl">MAE</span>
+                        <strong class="stat-box-val" id="stat-mae">168.69 m</strong>
+                        <span class="stat-box-unit">Mean Abs Error</span>
+                    </div>
+                    <div class="stat-box accent">
+                        <span class="stat-box-lbl">Correlation (r)</span>
+                        <strong class="stat-box-val" id="stat-corr">0.711</strong>
+                        <span class="stat-box-unit">Pearson Index</span>
+                    </div>
+                </div>
+
+                <div class="provenance-detail-card" id="validation-provenance-box" style="margin-bottom: 16px; padding: 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px;">
+                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8; margin-bottom: 4px;">
+                        <i class="fa-solid fa-shield-halved"></i> Verified Ground Truth Reference
+                    </div>
+                    <div style="font-size: 12px; color: #f8fafc; font-weight: 600;" id="val-dem-dataset">NASA SRTM GL1 30m (Wayanad Sector)</div>
+                    <div style="font-size: 11px; color: #94a3b8; margin-top: 3px;" id="val-dem-meta">Tier: VERIFIED_BENCHMARK &bull; GSD: 8.58 m/px</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 3px; font-family: monospace;" id="val-dem-hash">SHA256: 0bf0c5432c23... (Cryptographically Verified)</div>
+                </div>
+
+                <button class="btn-execute-primary" id="btn-run-validation">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span>Recompute Accuracy Statistics</span>
+                </button>
+            </div>
+
+            <!-- Persistent Flythrough Navigation Controller -->
+            <div class="navigation-controller-card">
+                <div class="nav-card-header">
+                    <div class="nav-card-title"><i class="fa-solid fa-compass"></i> 3D Camera Controls</div>
+                    <span class="cam-mode-pill" id="cam-mode-indicator">Orbit Gimbal</span>
+                </div>
+                
+                <div class="nav-mode-buttons">
+                    <button class="btn-mode-select active" id="btn-cam-orbit" data-mode="orbit">
+                        <i class="fa-solid fa-arrows-spin"></i> Orbit Mode
+                    </button>
+                    <button class="btn-mode-select" id="btn-cam-flight" data-mode="flight">
+                        <i class="fa-solid fa-plane-up"></i> Drone Flight
+                    </button>
+                </div>
+
+                <div class="flight-keys-helper" id="flight-helper-box">
+                    <div class="key-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Horizontal Flight</div>
+                    <div class="key-row"><kbd>Q</kbd> Descend &bull; <kbd>E</kbd> Ascend</div>
+                    <div class="key-row"><kbd>Shift</kbd> Turbo Velocity</div>
+                    <div class="key-row"><kbd>Mouse Drag</kbd> Pitch &amp; Yaw Look</div>
+                </div>
+
+                <div class="flight-speed-slider-wrap">
+                    <span class="slider-lbl">Flight Speed:</span>
+                    <input type="range" id="flight-speed-range" min="0.5" max="3.0" step="0.25" value="1.0" class="speed-slider">
+                    <span class="speed-val" id="flight-speed-val">1.0x</span>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Center 3D WebGL GIS Viewport -->
+        <section class="viewport-stage">
+            
+            <!-- Three.js Canvas Container -->
+            <div id="three-canvas-container" class="canvas-viewport">
+                
+                <!-- Floating Top-Left Telemetry Reticle HUD -->
+                <div class="hud-telemetry-pill" id="inspector-pill">
+                    <div class="telemetry-col">
+                        <span class="t-label"><i class="fa-solid fa-location-dot"></i> POSITION</span>
+                        <strong class="t-value mono" id="insp-coords">11.4502° N, 76.1311° E</strong>
+                    </div>
+                    <div class="telemetry-divider"></div>
+                    <div class="telemetry-col">
+                        <span class="t-label"><i class="fa-solid fa-ruler-vertical"></i> ELEVATION (Z)</span>
+                        <strong class="t-value mono highlight" id="insp-height">464.4 m</strong>
+                    </div>
+                    <div class="telemetry-divider"></div>
+                    <div class="telemetry-col">
+                        <span class="t-label"><i class="fa-solid fa-chart-line"></i> LOCAL SLOPE</span>
+                        <strong class="t-value mono" id="insp-slope">18.5°</strong>
+                    </div>
+                </div>
+
+                <!-- Floating Top-Right 3D Shader Switcher Quickbar -->
+                <div class="hud-shader-quickbar">
+                    <div class="shader-quickbar-inner">
+                        <button class="quick-shader-btn active" data-mode="rgb" title="True-Color Optical Satellite Image">
+                            <i class="fa-solid fa-satellite"></i>
+                            <span>Optical RGB</span>
+                        </button>
+                        <button class="quick-shader-btn" data-mode="dsm" title="Continuous Elevation Heatmap (Spectral)">
+                            <i class="fa-solid fa-mountain-sun"></i>
+                            <span>DSM Turbo</span>
+                        </button>
+                        <button class="quick-shader-btn" data-mode="slope" title="Slope Hazard Classification (0°-90°)">
+                            <i class="fa-solid fa-compass-drafting"></i>
+                            <span>Slope Hazard</span>
+                        </button>
+                        <button class="quick-shader-btn" data-mode="change" id="btn-shader-change" title="Bi-temporal Elevation Difference (ΔZ)">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>Disaster ΔZ</span>
+                        </button>
+                        <button class="quick-shader-btn" data-mode="wireframe" title="Topological Surface Mesh Wireframe">
+                            <i class="fa-solid fa-border-all"></i>
+                            <span>Wireframe</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Floating Interactive Elevation Colorbar Legend -->
+                <div class="hud-colorbar-legend" id="colorbar-legend">
+                    <div class="colorbar-header">
+                        <span id="colorbar-title">Elevation (m AGL)</span>
+                    </div>
+                    <div class="colorbar-bar" id="colorbar-gradient"></div>
+                    <div class="colorbar-ticks">
+                        <span id="colorbar-max" class="mono">550 m</span>
+                        <span id="colorbar-mid" class="mono">485 m</span>
+                        <span id="colorbar-min" class="mono">420 m</span>
+                    </div>
+                </div>
+
+                <!-- Viewport Reset Camera Floating Button -->
+                <button class="btn-viewport-action" id="btn-reset-camera" title="Reset Perspective View">
+                    <i class="fa-solid fa-arrows-to-dot"></i>
+                </button>
+
+                <!-- Inference & Loading Overlay -->
+                <div class="loading-overlay" id="loading-overlay">
+                    <div class="loading-spinner-ring"></div>
+                    <h3 id="loading-text" class="loading-title">Running Depth-Anything-V2 Inference...</h3>
+                    <p class="loading-sub">Extracting monocular depth features &amp; calibrating metric elevation anchors</p>
+                </div>
+
+            </div>
+
+            <!-- Bottom Telemetry & GIS Action Shelf -->
+            <div class="bottom-telemetry-shelf">
+                
+                <div class="shelf-stats-strip">
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Base Elevation</span>
+                        <strong class="sm-val mono" id="val-min-elev">531.7 m</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Peak Elevation</span>
+                        <strong class="sm-val mono" id="val-max-elev">1745.5 m</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Total Relief</span>
+                        <strong class="sm-val mono accent" id="val-relief">1213.9 m</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Spatial Grid</span>
+                        <strong class="sm-val mono" id="val-grid-size">512 x 512 px</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">GSD Resolution</span>
+                        <strong class="sm-val mono" id="val-resolution">8.58 m / px</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Data Provenance</span>
+                        <strong class="sm-val mono" id="val-provenance" title="Verified Reference DEM Source Tier"><i class="fa-solid fa-satellite"></i> NASA SRTM 30m</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Orientation</span>
+                        <strong class="sm-val mono" id="val-orientation"><i class="fa-solid fa-check"></i> Normal (Z+)</strong>
+                    </div>
+                </div>
+
+                <!-- Export Action Suite -->
+                <div class="shelf-export-actions">
+                    <span class="export-label"><i class="fa-solid fa-file-export"></i> Export GIS:</span>
+                    <a href="#" id="btn-export-geotiff" class="btn-export-pill" target="_blank" title="Export standard 32-bit Float GeoTIFF Raster">
+                        <i class="fa-solid fa-download"></i> GeoTIFF DSM
+                    </a>
+                    <a href="#" id="btn-export-obj" class="btn-export-pill" target="_blank" title="Export Wavefront .OBJ 3D Mesh">
+                        <i class="fa-solid fa-cube"></i> 3D Mesh (.OBJ)
+                    </a>
+                    <button id="btn-toggle-analytics-drawer" class="btn-toggle-drawer" title="Toggle Analytics & Validation Charts">
+                        <i class="fa-solid fa-chart-pie"></i> Charts Drawer
+                    </button>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- Right Retractable Analytics & Charts Drawer -->
+        <aside class="analytics-drawer open" id="analytics-drawer">
+            <div class="drawer-header-row">
+                <div class="drawer-title"><i class="fa-solid fa-chart-simple"></i> Surface Analytics &amp; Accuracy</div>
+                <button class="btn-close-drawer" id="btn-close-drawer" title="Hide Drawer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="drawer-scroll-content">
+                
+                <!-- Cross Section Transect Profile -->
+                <div class="analytics-chart-panel">
+                    <div class="chart-panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-chart-area"></i> Elevation Transect Profile</div>
+                        <span class="panel-badge">Cross-Section</span>
+                    </div>
+                    <div class="chart-canvas-wrap">
+                        <canvas id="chart-transect"></canvas>
+                    </div>
+                </div>
+
+                <!-- Predicted vs Ground Truth Scatter -->
+                <div class="analytics-chart-panel">
+                    <div class="chart-panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-braille"></i> Predicted vs Reference DEM (Z_m)</div>
+                        <span class="panel-badge">Correlation</span>
+                    </div>
+                    <div class="chart-canvas-wrap">
+                        <canvas id="chart-scatter"></canvas>
+                    </div>
+                </div>
+
+                <!-- Error Distribution Histogram -->
+                <div class="analytics-chart-panel">
+                    <div class="chart-panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-chart-column"></i> Residual Error Histogram (ΔZ_m)</div>
+                        <span class="panel-badge">Gaussian Fit</span>
+                    </div>
+                    <div class="chart-canvas-wrap">
+                        <canvas id="chart-histogram"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- Hosting & Deployment Modal Dialog -->
+    <div class="modal-backdrop" id="hosting-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <i class="fa-solid fa-server"></i>
+                    <div>
+                        <h2>DepthWizard Production Hosting Suite</h2>
+                        <p>Enterprise deployment options for running DepthWizard on Cloud, Local, or Hugging Face</p>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-hosting-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <button class="modal-tab-btn active" data-target="modal-tab-docker"><i class="fa-brands fa-docker"></i> Docker / Compose</button>
+                    <button class="modal-tab-btn" data-target="modal-tab-tunnel"><i class="fa-solid fa-globe"></i> Instant Public Tunnel</button>
+                    <button class="modal-tab-btn" data-target="modal-tab-hf"><i class="fa-solid fa-robot"></i> Hugging Face Spaces</button>
+                    <button class="modal-tab-btn" data-target="modal-tab-vps"><i class="fa-solid fa-cloud"></i> Cloud VPS (AWS/GCP)</button>
+                </div>
+
+                <!-- Docker Tab -->
+                <div class="modal-tab-content active" id="modal-tab-docker">
+                    <p class="modal-section-desc">Deploy DepthWizard with container isolation, multi-stage caching, and CPU/CUDA auto-detection:</p>
+                    <div class="code-block">
+                        <code># 1. Build and launch container in background
+docker compose up -d --build
+
+# 2. Access your workstation
+http://localhost:8000</code>
+                    </div>
+                    <p class="doc-link">See Dockerfile and docker-compose.yml in your project root.</p>
+                </div>
+
+                <!-- Instant Tunnel Tab -->
+                <div class="modal-tab-content" id="modal-tab-tunnel">
+                    <p class="modal-section-desc">Share DepthWizard publicly over high-speed HTTPS with zero port forwarding using Cloudflare Tunnel:</p>
+                    <div class="code-block">
+                        <code># Run instant free Cloudflare Tunnel script
+python deploy_tunnel.py</code>
+                    </div>
+                    <p class="doc-link">Or run directly with Cloudflared: <code>cloudflared tunnel --url http://127.0.0.1:8000</code></p>
+                </div>
+
+                <!-- Hugging Face Spaces Tab -->
+                <div class="modal-tab-content" id="modal-tab-hf">
+                    <p class="modal-section-desc">Host on Hugging Face Spaces for 24/7 free community access with optional ZeroGPU:</p>
+                    <div class="code-block">
+                        <code>1. Create new Space on huggingface.co/spaces (Select 'Docker' SDK)
+2. Add your repository files (server.py, depth_engine.py, static/, etc.)
+3. Push to Hugging Face Git remote - Spaces builds and serves automatically!</code>
+                    </div>
+                    <p class="doc-link">Refer to HOSTING_GUIDE.md for step-by-step instructions.</p>
+                </div>
+
+                <!-- Cloud VPS Tab -->
+                <div class="modal-tab-content" id="modal-tab-vps">
+                    <p class="modal-section-desc">Production systemd service configuration for Ubuntu / Debian servers:</p>
+                    <div class="code-block">
+                        <code>[Unit]
+Description=DepthWizard AI GIS Workstation
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/depthwizard
+ExecStart=/opt/depthwizard/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+
+[Install]
+WantedBy=multi-user.target</code>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Master Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
