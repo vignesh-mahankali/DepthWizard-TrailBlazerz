@@ -88,31 +88,86 @@
             <div class="sidebar-pane active" id="pane-single">
                 <div class="pane-section-header">
                     <div class="section-title"><i class="fa-solid fa-sliders"></i> Optical Scene & Scale Anchors</div>
-                    <span class="section-hint">Monocular 3D Reconstruction</span>
+                    <span class="section-hint">Photogrammetric AI Pipeline</span>
                 </div>
 
-                <!-- Scene Preset Quick Select -->
-                <div class="control-group">
-                    <label class="control-label">Pre-Calibrated ISRO Scenes</label>
+                <!-- Branch Architecture Switcher -->
+                <div class="branch-selector-container">
+                    <div class="branch-selector-header">
+                        <span class="branch-label"><i class="fa-solid fa-code-branch"></i> Pipeline Branch</span>
+                        <span class="branch-badge-pill" id="branch-badge-pill">Branch B: GeoTIFF (Active)</span>
+                    </div>
+                    <div class="branch-toggle-grid">
+                        <button type="button" class="branch-pill-btn active" id="btn-branch-b" data-branch="B">
+                            <div class="branch-pill-icon"><i class="fa-solid fa-earth-americas"></i></div>
+                            <div class="branch-pill-text">
+                                <strong class="branch-pill-title">Branch B: GeoTIFF DSM</strong>
+                                <span class="branch-pill-desc">WGS-84 Coordinates · Real 30m DEM</span>
+                            </div>
+                        </button>
+                        <button type="button" class="branch-pill-btn" id="btn-branch-a" data-branch="A">
+                            <div class="branch-pill-icon"><i class="fa-solid fa-image"></i></div>
+                            <div class="branch-pill-text">
+                                <strong class="branch-pill-title">Branch A: Optical RGB</strong>
+                                <span class="branch-pill-desc">Unreferenced Image · Relative DSM</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scene Preset Quick Select (Branch B: Georeferenced GeoTIFFs) -->
+                <div class="control-group" id="group-branch-b-presets">
+                    <div class="label-split">
+                        <label class="control-label"><i class="fa-solid fa-satellite"></i> Verified GeoTIFF Benchmarks</label>
+                        <span class="badge-crs">EPSG:4326</span>
+                    </div>
                     <div class="preset-cards-row">
-                        <button class="preset-chip active" data-preset="wayanad_pre_disaster.jpg">
+                        <button class="preset-chip active" data-preset="wayanad_real_optical.tif" data-branch="B">
                             <i class="fa-solid fa-mountain"></i>
                             <div class="chip-text">
-                                <span class="chip-title">Wayanad Scarp</span>
-                                <span class="chip-sub">Hilly Mountain (530-1745m)</span>
+                                <span class="chip-title">Wayanad Real GeoTIFF</span>
+                                <span class="chip-sub">11.4°–11.7°N, 76.0°–76.4°E (11.5–2330m)</span>
                             </div>
                         </button>
-                        <button class="preset-chip" data-preset="urban_kolkata.jpg">
+                        <button class="preset-chip" data-preset="kolkata_real_optical.tif" data-branch="B">
                             <i class="fa-solid fa-city"></i>
                             <div class="chip-text">
-                                <span class="chip-title">Kolkata Basin</span>
-                                <span class="chip-sub">Urban Delta (0-21m)</span>
+                                <span class="chip-title">Kolkata Real GeoTIFF</span>
+                                <span class="chip-sub">22.55°–22.59°N, 88.34°–88.38°E</span>
                             </div>
                         </button>
-                        <button class="preset-chip" data-preset="wayanad_post_disaster.jpg">
+                        <button class="preset-chip" data-preset="wayanad_post_real_optical.tif" data-branch="B">
                             <i class="fa-solid fa-land-mine-on"></i>
                             <div class="chip-text">
-                                <span class="chip-title">Landslide Zone</span>
+                                <span class="chip-title">Wayanad Landslide</span>
+                                <span class="chip-sub">Post-Disaster Ruptured Slope</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scene Preset Quick Select (Branch A: Standard Optical Images) -->
+                <div class="control-group" id="group-branch-a-presets" style="display: none;">
+                    <label class="control-label"><i class="fa-solid fa-image"></i> Standard Optical Scenes (Unreferenced)</label>
+                    <div class="preset-cards-row">
+                        <button class="preset-chip" data-preset="wayanad_pre_disaster.jpg" data-branch="A">
+                            <i class="fa-solid fa-mountain"></i>
+                            <div class="chip-text">
+                                <span class="chip-title">Wayanad Scarp JPG</span>
+                                <span class="chip-sub">Hilly Mountain Optical</span>
+                            </div>
+                        </button>
+                        <button class="preset-chip" data-preset="urban_kolkata.jpg" data-branch="A">
+                            <i class="fa-solid fa-city"></i>
+                            <div class="chip-text">
+                                <span class="chip-title">Kolkata Basin JPG</span>
+                                <span class="chip-sub">Urban Delta Optical</span>
+                            </div>
+                        </button>
+                        <button class="preset-chip" data-preset="wayanad_post_disaster.jpg" data-branch="A">
+                            <i class="fa-solid fa-land-mine-on"></i>
+                            <div class="chip-text">
+                                <span class="chip-title">Landslide Zone JPG</span>
                                 <span class="chip-sub">Ruptured Hillslope</span>
                             </div>
                         </button>
@@ -130,10 +185,36 @@
                             <div class="dropzone-icon-circle"><i class="fa-solid fa-cloud-arrow-up"></i></div>
                             <div class="dropzone-text">
                                 <strong id="file-single-label">Drop satellite scene or click to browse</strong>
-                                <span>Supports high-resolution single-view optical imagery</span>
+                                <span>Supports high-resolution single-view optical GeoTIFF or JPG/PNG</span>
                             </div>
                         </div>
                         <input type="file" id="input-single-file" accept=".jpg,.jpeg,.png,.tif,.tiff" hidden>
+                    </div>
+                </div>
+
+                <!-- Live Geospatial GeoTIFF Inspector Card -->
+                <div class="geotiff-inspector-card" id="geotiff-inspector-card">
+                    <div class="insp-header-row">
+                        <div class="insp-title"><i class="fa-solid fa-satellite-dish"></i> Geospatial Metadata Inspector</div>
+                        <span class="insp-crs-badge" id="insp-crs">EPSG:4326</span>
+                    </div>
+                    <div class="insp-data-grid">
+                        <div class="insp-stat-item">
+                            <span class="insp-label">Bounding Box (W, S, E, N)</span>
+                            <strong class="insp-val mono" id="insp-bounds">76.000°, 11.400°, 76.400°, 11.700°</strong>
+                        </div>
+                        <div class="insp-stat-item">
+                            <span class="insp-label">Ground Sampling (GSD)</span>
+                            <strong class="insp-val mono" id="insp-gsd">74.99 m/px</strong>
+                        </div>
+                        <div class="insp-stat-item">
+                            <span class="insp-label">Elevation Reference</span>
+                            <strong class="insp-val mono text-emerald" id="insp-dem-tier">Copernicus GLO-30 / SRTM 30m</strong>
+                        </div>
+                        <div class="insp-stat-item">
+                            <span class="insp-label">GeoTIFF Reader Validation</span>
+                            <strong class="insp-val mono text-cyan" id="insp-status"><i class="fa-solid fa-circle-check"></i> task2/geotiff_reader Verified</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -427,6 +508,10 @@
                     <div class="shelf-metric-item">
                         <span class="sm-label">Peak Elevation</span>
                         <strong class="sm-val mono" id="val-max-elev">1745.5 m</strong>
+                    </div>
+                    <div class="shelf-metric-item">
+                        <span class="sm-label">Active Branch</span>
+                        <strong class="sm-val mono text-cyan" id="val-branch-badge"><i class="fa-solid fa-earth-americas"></i> Branch B: GeoTIFF</strong>
                     </div>
                     <div class="shelf-metric-item">
                         <span class="sm-label">Total Relief</span>

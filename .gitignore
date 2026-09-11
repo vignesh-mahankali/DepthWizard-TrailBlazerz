@@ -12,3 +12,4 @@ output3/
 outputs/
 exports/
 .env
+dem_cache/

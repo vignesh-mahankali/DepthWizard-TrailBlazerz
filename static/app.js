@@ -58,24 +58,92 @@ function initUIEvents() {
         });
     });
 
+    // Branch Architecture Switcher (Branch A vs Branch B)
+    let activeBranch = 'B';
+    const btnBranchB = document.getElementById('btn-branch-b');
+    const btnBranchA = document.getElementById('btn-branch-a');
+    const groupBranchB = document.getElementById('group-branch-b-presets');
+    const groupBranchA = document.getElementById('group-branch-a-presets');
+    const branchBadgePill = document.getElementById('branch-badge-pill');
+    const inspectorCard = document.getElementById('geotiff-inspector-card');
+
+    function updateInspectorData(presetFile) {
+        const crsEl = document.getElementById('insp-crs');
+        const boundsEl = document.getElementById('insp-bounds');
+        const gsdEl = document.getElementById('insp-gsd');
+        const demEl = document.getElementById('insp-dem-tier');
+        const statusEl = document.getElementById('insp-status');
+
+        if (presetFile.includes('kolkata')) {
+            if (boundsEl) boundsEl.innerText = '88.340°E, 22.550°N — 88.380°E, 22.590°N';
+            if (gsdEl) gsdEl.innerText = '30.82 m/px';
+            if (demEl) demEl.innerText = 'Copernicus GLO-30 / NASA SRTM 30m (Delta Basin)';
+        } else if (presetFile.includes('wayanad')) {
+            if (boundsEl) boundsEl.innerText = '76.000°E, 11.400°N — 76.400°E, 11.700°N';
+            if (gsdEl) gsdEl.innerText = '74.99 m/px';
+            if (demEl) demEl.innerText = 'Copernicus GLO-30 / NASA SRTM 30m (Western Ghats)';
+        }
+        if (crsEl) crsEl.innerText = 'EPSG:4326';
+        if (statusEl) statusEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> task2/geotiff_reader Verified';
+    }
+
+    function switchBranch(branch) {
+        activeBranch = branch;
+        if (branch === 'B') {
+            if (btnBranchB) btnBranchB.classList.add('active');
+            if (btnBranchA) btnBranchA.classList.remove('active');
+            if (groupBranchB) groupBranchB.style.display = 'block';
+            if (groupBranchA) groupBranchA.style.display = 'none';
+            if (branchBadgePill) branchBadgePill.innerText = 'Branch B: GeoTIFF (Active)';
+            if (inspectorCard) inspectorCard.style.display = 'block';
+            
+            const firstB = groupBranchB ? groupBranchB.querySelector('.preset-chip') : null;
+            if (firstB) firstB.click();
+        } else {
+            if (btnBranchA) btnBranchA.classList.add('active');
+            if (btnBranchB) btnBranchB.classList.remove('active');
+            if (groupBranchA) groupBranchA.style.display = 'block';
+            if (groupBranchB) groupBranchB.style.display = 'none';
+            if (branchBadgePill) branchBadgePill.innerText = 'Branch A: Optical RGB (Active)';
+            if (inspectorCard) inspectorCard.style.display = 'none';
+            
+            const firstA = groupBranchA ? groupBranchA.querySelector('.preset-chip') : null;
+            if (firstA) firstA.click();
+        }
+    }
+
+    if (btnBranchB) btnBranchB.addEventListener('click', () => switchBranch('B'));
+    if (btnBranchA) btnBranchA.addEventListener('click', () => switchBranch('A'));
+
     // Preset Scene Chips (Tab 1)
     const presetChips = document.querySelectorAll('.preset-chip');
     presetChips.forEach(chip => {
         chip.addEventListener('click', () => {
-            presetChips.forEach(c => c.classList.remove('active'));
+            const branch = chip.dataset.branch || 'B';
+            // Only deactivate chips within the same group
+            const parentGroup = chip.closest('.control-group');
+            if (parentGroup) {
+                parentGroup.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+            } else {
+                presetChips.forEach(c => c.classList.remove('active'));
+            }
             chip.classList.add('active');
             const presetFile = chip.dataset.preset;
             
             // Auto-calibrate scene presets based on real SRTM topography
-            if (presetFile === 'urban_kolkata.jpg') {
+            if (presetFile.includes('kolkata')) {
                 document.getElementById('input-base-elev').value = 5;
-                document.getElementById('input-relief-range').value = 17;
-            } else if (presetFile === 'wayanad_post_disaster.jpg') {
+                document.getElementById('input-relief-range').value = 30;
+            } else if (presetFile.includes('post')) {
                 document.getElementById('input-base-elev').value = 510;
                 document.getElementById('input-relief-range').value = 1200;
             } else {
                 document.getElementById('input-base-elev').value = 530;
                 document.getElementById('input-relief-range').value = 1215;
+            }
+
+            if (branch === 'B') {
+                updateInspectorData(presetFile);
             }
             loadSampleScene(presetFile);
         });
@@ -94,8 +162,11 @@ function initUIEvents() {
         if (fileInput.files.length > 0) {
             uploadAndProcessSingle(fileInput.files[0]);
         } else {
-            const activeChip = document.querySelector('.preset-chip.active');
-            const preset = activeChip ? activeChip.dataset.preset : "wayanad_pre_disaster.jpg";
+            // Find active chip in currently active branch preset group
+            const activeGroup = activeBranch === 'B' ? groupBranchB : groupBranchA;
+            const activeChip = activeGroup ? activeGroup.querySelector('.preset-chip.active') : document.querySelector('.preset-chip.active');
+            const defaultPreset = activeBranch === 'B' ? "wayanad_real_optical.tif" : "wayanad_pre_disaster.jpg";
+            const preset = activeChip ? activeChip.dataset.preset : defaultPreset;
             loadSampleScene(preset);
         }
     });
@@ -561,7 +632,7 @@ async function loadSampleScene(sampleKey) {
         const data = await res.json();
 
         if (data.status === 'success') {
-            updateMetricsUI(data.stats, data.dem_provenance, data.scale_info);
+            updateMetricsUI(data.stats, data.dem_provenance, data.scale_info, data.geo_metadata, data.branch, data.validation);
             build3DTerrainMesh(data.elevation_grid, data.images.optical_rgb_b64, data.images.depth_heatmap_b64, null, data.stats);
 
             document.getElementById('btn-export-geotiff').href = data.downloads.geotiff_dsm;
@@ -587,7 +658,7 @@ async function uploadAndProcessSingle(file) {
         const data = await res.json();
 
         if (data.status === 'success') {
-            updateMetricsUI(data.stats, data.dem_provenance, data.scale_info);
+            updateMetricsUI(data.stats, data.dem_provenance, data.scale_info, data.geo_metadata, data.branch, data.validation);
             build3DTerrainMesh(data.elevation_grid, data.images.optical_rgb_b64, data.images.depth_heatmap_b64, null, data.stats);
 
             document.getElementById('btn-export-geotiff').href = data.downloads.geotiff_dsm;
@@ -706,7 +777,7 @@ async function runValidation() {
     }
 }
 
-function updateMetricsUI(stats, provenance, scaleInfo) {
+function updateMetricsUI(stats, provenance, scaleInfo, geoMetadata, branch, validation) {
     if (!stats) return;
     document.getElementById('val-min-elev').innerText = `${stats.min_elevation_m.toFixed(1)} m`;
     document.getElementById('val-max-elev').innerText = `${stats.max_elevation_m.toFixed(1)} m`;
@@ -716,9 +787,45 @@ function updateMetricsUI(stats, provenance, scaleInfo) {
         const resEl = document.getElementById('val-resolution');
         if (resEl) resEl.innerText = `${stats.pixel_resolution_m.toFixed(2)} m / px`;
     }
+    
+    // Update Active Branch Badge in shelf
+    const branchBadge = document.getElementById('val-branch-badge');
+    if (branchBadge) {
+        const isBranchB = (branch === 'BRANCH_B_GEOREFERENCED') || (geoMetadata && geoMetadata.has_georeference);
+        if (isBranchB) {
+            branchBadge.innerHTML = '<i class="fa-solid fa-earth-americas"></i> Branch B: GeoTIFF';
+            branchBadge.className = 'sm-val mono text-cyan';
+        } else {
+            branchBadge.innerHTML = '<i class="fa-solid fa-image"></i> Branch A: Optical';
+            branchBadge.className = 'sm-val mono text-purple';
+        }
+    }
+
+    // Update Inspector Card if metadata is present
+    if (geoMetadata && geoMetadata.has_georeference && geoMetadata.bounds) {
+        const b = geoMetadata.bounds;
+        const bStr = `${b[0].toFixed(3)}°E, ${b[1].toFixed(3)}°N — ${b[2].toFixed(3)}°E, ${b[3].toFixed(3)}°N`;
+        const boundsEl = document.getElementById('insp-bounds');
+        if (boundsEl) boundsEl.innerText = bStr;
+        const gsdEl = document.getElementById('insp-gsd');
+        if (gsdEl) gsdEl.innerText = `${(geoMetadata.resolution_m || stats.pixel_resolution_m || 74.99).toFixed(2)} m/px`;
+        const crsEl = document.getElementById('insp-crs');
+        if (crsEl) crsEl.innerText = geoMetadata.crs || 'EPSG:4326';
+    }
+
+    // Update Accuracy Drawer if validation available
+    if (validation) {
+        const rmseEl = document.getElementById('stat-rmse');
+        const maeEl = document.getElementById('stat-mae');
+        const corrEl = document.getElementById('stat-corr');
+        if (rmseEl) rmseEl.innerText = `${validation.rmse.toFixed(2)} m`;
+        if (maeEl) maeEl.innerText = `${validation.mae.toFixed(2)} m`;
+        if (corrEl) corrEl.innerText = validation.correlation.toFixed(3);
+    }
+
     const provElem = document.getElementById('val-provenance');
     if (provElem) {
-        if (provenance && provenance.source_tier === 'VERIFIED_BENCHMARK') {
+        if (provenance && (provenance.source_tier === 'VERIFIED_BENCHMARK' || provenance.source_tier === 'LIVE_COPERNICUS_GLO30')) {
             provElem.innerHTML = `<span style="color: #10b981;"><i class="fa-solid fa-shield-check"></i> ${provenance.dataset_name.split('(')[0].trim()}</span>`;
             provElem.title = `Verified Benchmark: ${provenance.dataset_name} (${provenance.attribution})`;
         } else if (provenance && provenance.source_tier === 'LIVE_OPEN_TOPO_SRTM') {

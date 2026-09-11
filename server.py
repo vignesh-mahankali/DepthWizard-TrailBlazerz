@@ -11,6 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+# Ensure parent directory is in path
+PARENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
+
 from depth_engine import (
     DepthEngine, 
     GeoSpatialManager, 
@@ -25,7 +30,7 @@ from sample_data import ensure_sample_datasets, SAMPLE_DIR
 
 app = FastAPI(
     title="DepthWizard API", 
-    description="Scientific Monocular Height Estimation, Photogrammetric Calibration & 3D Flythrough Platform"
+    description="Scientific Monocular Height Estimation, Photogrammetric Calibration & 3D Flythrough Platform (Branch A & Branch B)"
 )
 
 # CORS middleware
@@ -77,14 +82,70 @@ def ndarray_to_base64(img_array: np.ndarray, format: str = 'PNG') -> str:
 @app.get("/api/status")
 def get_status():
     model_loaded = depth_engine is not None and depth_engine.model is not None
+    branch_b_samples = [k for k in sample_datasets.keys() if k.endswith(('.tif', '.tiff'))]
     return {
         "status": "ready" if model_loaded else "degraded",
-        "system": "DepthWizard Engine v2.2 (Scientific Photogrammetry)",
+        "system": "DepthWizard Engine v2.3 (Branch A & Branch B Photogrammetry)",
         "device": str(depth_engine.device) if depth_engine else "unavailable",
         "model_loaded": model_loaded,
+        "branches": {
+            "branch_a": "Optical Monocular (Relative DSM)",
+            "branch_b": "Georeferenced GeoTIFF (Absolute Metric DSM with Real 30m Topography)"
+        },
         "verified_benchmarks": list(SRTMDataProvider.VERIFIED_BENCHMARKS.keys()),
-        "sample_datasets": list(sample_datasets.keys())
+        "sample_datasets": list(sample_datasets.keys()),
+        "branch_b_geotiff_samples": branch_b_samples
     }
+
+
+@app.get("/api/branch_b/samples")
+def get_branch_b_samples():
+    """Returns curated georeferenced GeoTIFF samples with genuine coordinates."""
+    samples = [
+        {
+            "id": "wayanad_real_optical.tif",
+            "name": "Wayanad Scarp Pre-Disaster (Genuine GeoTIFF)",
+            "bounds": [76.0, 11.4, 76.4, 11.7],
+            "crs": "EPSG:4326",
+            "elevation_range": "11.5m – 2330m",
+            "type": "optical_rgb",
+            "dem_reference": "Copernicus GLO-30 / NASA SRTM 30m"
+        },
+        {
+            "id": "wayanad_post_real_optical.tif",
+            "name": "Wayanad Landslide Post-Disaster (Genuine GeoTIFF)",
+            "bounds": [76.0, 11.4, 76.4, 11.7],
+            "crs": "EPSG:4326",
+            "elevation_range": "11.5m – 2330m",
+            "type": "optical_rgb",
+            "dem_reference": "Copernicus GLO-30 / NASA SRTM 30m"
+        },
+        {
+            "id": "kolkata_real_optical.tif",
+            "name": "Kolkata Hooghly Basin (Genuine GeoTIFF)",
+            "bounds": [88.34, 22.55, 88.38, 22.59],
+            "crs": "EPSG:4326",
+            "elevation_range": "2m – 35m",
+            "type": "optical_rgb",
+            "dem_reference": "Copernicus GLO-30 / NASA SRTM 30m"
+        }
+    ]
+    return {"status": "success", "samples": samples}
+
+
+@app.get("/api/geotiff_info")
+def get_geotiff_info(key: str = Query(...)):
+    """Extracts geospatial metadata for any sample or uploaded GeoTIFF file."""
+    path = sample_datasets.get(key)
+    if not path or not os.path.exists(path):
+        path = os.path.join(SAMPLE_DIR, key)
+    if not os.path.exists(path):
+        path = os.path.join(OUTPUT_DIR, key)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"GeoTIFF '{key}' not found")
+        
+    meta = GeoSpatialManager.extract_geometadata(path)
+    return {"status": "success", "file": key, "metadata": meta}
 
 
 @app.post("/api/process")
@@ -103,41 +164,58 @@ async def process_single_image(
 
     try:
         temp_path = None
+        is_geotiff = False
         if file is not None:
             contents = await file.read()
             temp_path = os.path.join(OUTPUT_DIR, f"temp_{file.filename}")
             with open(temp_path, "wb") as f:
                 f.write(contents)
-            image_bgr = cv2.imread(temp_path)
             filename = file.filename
+            is_geotiff = filename.lower().endswith(('.tif', '.tiff'))
+            if is_geotiff:
+                image_bgr = GeoSpatialManager.read_geotiff_image(temp_path)
+            else:
+                image_bgr = cv2.imread(temp_path)
         elif sample_key in sample_datasets:
             temp_path = sample_datasets[sample_key]
-            image_bgr = cv2.imread(temp_path)
             filename = sample_key
+            is_geotiff = filename.lower().endswith(('.tif', '.tiff'))
+            if is_geotiff:
+                image_bgr = GeoSpatialManager.read_geotiff_image(temp_path)
+            else:
+                image_bgr = cv2.imread(temp_path)
         else:
-            temp_path = sample_datasets.get("wayanad_pre_disaster.jpg")
-            image_bgr = cv2.imread(temp_path)
-            filename = "wayanad_pre_disaster.jpg"
+            filename = "wayanad_real_optical.tif" if "wayanad_real_optical.tif" in sample_datasets else "wayanad_pre_disaster.jpg"
+            temp_path = sample_datasets.get(filename)
+            is_geotiff = filename.lower().endswith(('.tif', '.tiff'))
+            if is_geotiff:
+                image_bgr = GeoSpatialManager.read_geotiff_image(temp_path)
+            else:
+                image_bgr = cv2.imread(temp_path)
 
         if image_bgr is None:
             raise HTTPException(status_code=400, detail="Unable to decode optical image raster")
 
-        # 1. Extract Spatial Metadata (GeoTIFF tags if present)
+        # 1. Extract Spatial Metadata (GeoTIFF tags via rasterio)
         geo_meta = GeoSpatialManager.extract_geometadata(temp_path)
-        
-        # 2. Estimate Relative Depth Map
+        has_geo = geo_meta.get("has_georeference", False)
+        branch_type = "BRANCH_B_GEOREFERENCED" if has_geo else "BRANCH_A_OPTICAL"
+
+        # 2. Estimate Relative Depth Map with Depth-Anything-V2
         rel_depth = depth_engine.predict_relative_depth(image_bgr)
         
         # 3. Retrieve reference DEM with verified provenance
         ref_dem = None
         prov = None
-        if use_georeference and geo_meta.get("has_georeference") and geo_meta.get("bounds"):
+        if use_georeference and has_geo and geo_meta.get("bounds"):
+            # Branch B: Georeferenced footprint matching
             ref_dem, prov = ScaleCalibrator.get_reference_dem(
                 rel_depth.shape, 
                 bounds=geo_meta.get("bounds")
             )
-        elif sample_key or filename:
-            # Check verified benchmark catalog
+            
+        if ref_dem is None and (sample_key or filename):
+            # Fallback to verified benchmark catalog lookup
             ref_dem, prov = ScaleCalibrator.get_reference_dem(
                 rel_depth.shape, 
                 sample_key=filename
@@ -167,7 +245,7 @@ async def process_single_image(
         )
         geo_meta["resolution_m"] = pixel_res_m
 
-        # 6. Save GeoTIFF DSM export
+        # 6. Save genuine GeoTIFF DSM export with standard CRS & transform
         dsm_filename = f"dsm_{filename.rsplit('.', 1)[0]}.tif"
         dsm_export_path = os.path.join(OUTPUT_DIR, dsm_filename)
         GeoSpatialManager.save_dsm_geotiff(dsm_export_path, abs_dsm, geo_meta)
@@ -197,8 +275,19 @@ async def process_single_image(
         optical_b64 = ndarray_to_base64(image_bgr)
         depth_b64 = ndarray_to_base64(depth_colormap)
 
+        # 10. Photogrammetric Validation (if reference DEM available)
+        val_report = None
+        if ref_dem is not None:
+            try:
+                val_report = DSMValidator.validate(
+                    abs_dsm, ref_dem, pixel_res_m=pixel_res_m, provenance=prov
+                )
+            except Exception as e:
+                print(f"Validation calculation skipped: {e}")
+
         return {
             "status": "success",
+            "branch": branch_type,
             "filename": filename,
             "scale_info": {
                 "scale": scale_info.get("scale"),
@@ -208,6 +297,7 @@ async def process_single_image(
             },
             "dem_provenance": scale_info.get("provenance"),
             "geo_metadata": geo_meta,
+            "validation": val_report,
             "stats": {
                 "min_elevation_m": round(min_z, 2),
                 "max_elevation_m": round(max_z, 2),
@@ -298,31 +388,27 @@ async def process_disaster_pair(
         # 6. Prepare grid data for WebGL 3D difference rendering
         grid_size = 128
         diff_grid = cv2.resize(diff_dsm, (grid_size, grid_size), interpolation=cv2.INTER_CUBIC).tolist()
-        pre_dsm_grid = cv2.resize(pre_dsm, (grid_size, grid_size), interpolation=cv2.INTER_CUBIC).tolist()
         post_dsm_grid = cv2.resize(post_dsm, (grid_size, grid_size), interpolation=cv2.INTER_CUBIC).tolist()
+
+        post_b64 = ndarray_to_base64(post_bgr)
+        pre_b64 = ndarray_to_base64(pre_bgr)
+        change_b64 = ndarray_to_base64(rgba_change_map)
 
         return {
             "status": "success",
-            "disaster_name": "Landslide & Erosion Analysis (Wayanad Sector)",
             "metrics": metrics,
-            "dem_provenance": pre_prov.to_dict() if pre_prov else None,
-            "pre_scale_info": pre_scale,
-            "post_scale_info": post_scale,
             "images": {
-                "pre_rgb_b64": ndarray_to_base64(pre_bgr),
-                "post_rgb_b64": ndarray_to_base64(post_bgr),
-                "change_heatmap_b64": ndarray_to_base64(rgba_change_map, format='PNG')
+                "post_rgb_b64": post_b64,
+                "pre_rgb_b64": pre_b64,
+                "change_heatmap_b64": change_b64
             },
             "grids": {
                 "diff_grid": diff_grid,
-                "pre_dsm_grid": pre_dsm_grid,
                 "post_dsm_grid": post_dsm_grid
             }
         }
-    except RuntimeError as re:
-        raise HTTPException(status_code=503, detail=str(re))
     except Exception as e:
-        print(f"Disaster processing error: {e}")
+        print(f"Error in disaster processing: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -359,7 +445,7 @@ async def validate_dsm(
             
         rel_depth = depth_engine.predict_relative_depth(img_bgr)
         
-        # Ground Truth reference DEM (Genuine SRTM 30m)
+        # Ground Truth reference DEM (Genuine SRTM 30m / Copernicus)
         ref_dsm, prov = ScaleCalibrator.get_reference_dem(rel_depth.shape, sample_key=query_key)
         if ref_dsm is None or prov.source_tier == "NONE":
             raise HTTPException(
@@ -400,7 +486,7 @@ def search_live_satellite_data(query: str = Query("Wayanad, Kerala")):
             "acquisition_date": "2026-08-04",
             "sensor": "Sentinel-2 / ISRO Optical RGB",
             "resolution": "8.58m",
-            "sample_key": "wayanad_pre_disaster.jpg",
+            "sample_key": "wayanad_real_optical.tif",
             "has_disaster_pair": True
         },
         {
@@ -411,7 +497,7 @@ def search_live_satellite_data(query: str = Query("Wayanad, Kerala")):
             "acquisition_date": "2026-07-15",
             "sensor": "Landsat-9 / Sentinel-2 RGB",
             "resolution": "8.72m",
-            "sample_key": "urban_kolkata.jpg",
+            "sample_key": "kolkata_real_optical.tif",
             "has_disaster_pair": False
         },
         {
@@ -422,7 +508,7 @@ def search_live_satellite_data(query: str = Query("Wayanad, Kerala")):
             "acquisition_date": "2026-08-06",
             "sensor": "Sentinel-2 / Optical RGB",
             "resolution": "8.58m",
-            "sample_key": "wayanad_post_disaster.jpg",
+            "sample_key": "wayanad_post_real_optical.tif",
             "has_disaster_pair": True
         }
     ]
