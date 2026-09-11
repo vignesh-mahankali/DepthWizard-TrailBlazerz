@@ -1,0 +1,9 @@
+*.obj
+*.ply
+*.glb
+output*/
+outputs/
+venv/
+__pycache__/
+*.pyc
+Depth-Anything-V2/

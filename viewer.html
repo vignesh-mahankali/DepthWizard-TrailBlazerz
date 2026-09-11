@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>DepthWizard Flythrough</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+    }
+  </style>
+</head>
+<body>
+
+<button id="resetBtn" style="position:absolute; top:10px; left:10px; z-index:10; padding:8px 16px; cursor:pointer;">
+  Restart Flythrough
+</button>
+
+<select id="sceneSelect" style="position:absolute; top:10px; left:180px; z-index:10; padding:8px; cursor:pointer;">
+  <option value="terrain.glb">Scene 1</option>
+  <option value="terrain2.glb">Scene 2</option>
+  <option value="terrain3.glb">Scene 3</option>
+</select>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222233);
+
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(0, 20, 40);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+const light = new THREE.DirectionalLight(0xffffff, 2);
+light.position.set(50, 50, 50);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+const loader = new GLTFLoader();
+let currentModel = null;
+
+function loadScene(filename) {
+  if (currentModel) {
+    scene.remove(currentModel);
+    currentModel = null;
+  }
+
+  loader.load(filename, (gltf) => {
+    gltf.scene.traverse((child) => {
+      if (child.isMesh) {
+        child.material = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          side: THREE.DoubleSide
+        });
+      }
+    });
+
+    currentModel = gltf.scene;
+    scene.add(currentModel);
+    console.log("Model loaded:", filename);
+
+  }, undefined, (err) => {
+    console.error("Load error:", err);
+  });
+}
+
+loadScene('terrain.glb');
+
+let flythroughActive = true;
+let angle = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (flythroughActive) {
+    angle += 0.003;
+    const radius = 60;
+    camera.position.x = Math.sin(angle) * radius;
+    camera.position.z = Math.cos(angle) * radius;
+    camera.position.y = 25 + Math.sin(angle * 2) * 5;
+    camera.lookAt(0, 0, 0);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+renderer.domElement.addEventListener('pointerdown', () => {
+  flythroughActive = false;
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  angle = 0;
+  flythroughActive = true;
+});
+
+document.getElementById('sceneSelect').addEventListener('change', (e) => {
+  loadScene(e.target.value);
+  angle = 0;
+  flythroughActive = true;
+});
+</script>
+
+</body>
+</html>
