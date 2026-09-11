@@ -1,0 +1,72 @@
+# ==============================
+# Python virtual environment
+# ==============================
+venv/
+.venv/
+env/
+
+# ==============================
+# Python cache / temporary files
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# ==============================
+# Depth Anything V2 model weights
+# Huge files - re-download locally
+# ==============================
+Depth-Anything-V2/checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# ==============================
+# Generated pipeline outputs
+# Regenerate locally - don't push
+# ==============================
+output/
+output2/
+output3/
+outputN/
+
+*.ply
+*.obj
+*.glb
+*.gltf
+
+# ==============================
+# Test / temporary images
+# ==============================
+test*.jpg
+test*.jpeg
+test*.png
+
+# ==============================
+# Environment variables / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# OS / Editor files
+# ==============================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ==============================
+# Logs
+# ==============================
+*.log
+
+# ==============================
+# Build / cache directories
+# ==============================
+dist/
+build/
+.cache/
